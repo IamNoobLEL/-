@@ -4,15 +4,15 @@
 #include <sys/wait.h>
 int main()
 {
-	int fd1[2], fd2[2];
-	if ((pipe(fd1) == -1) || (pipe(fd2) == -1)) /* чекаем что дескрипторы рабочие */
+	int fd1[2], fd2[2]; 
+	if ((pipe(fd1) == -1) || (pipe(fd2) == -1)) /* чекаем что дескрипторы созданы успешно */
 	{
 		std::cout << "Ошибка в открытии pipe`s между родительским и дочерним процессами" << std::endl;
 		exit(1);
 	}
 
 	pid_t child;
-	if ((child = fork()) == -1) /* чекаем что дочерний процесс рабочий */
+	if ((child = fork()) == -1) /* чекаем что дочерний процесс создался успешно */
 	{
 		std::cout << "Ошибка в создании дочернего процесса" << std::endl;
 		exit(1);
@@ -26,14 +26,15 @@ int main()
 		std::cout << "Введите путь к файлу" << std::endl;
 		getline(std::cin, file_path); /*считываем строчку */
 
-		int length = file_path.length() + 1;
-		write(fd1[1], &length, sizeof(int));
+		int length = file_path.length() + 1; /*переменной присвоили длину строки. Почему +1? А потому что \0 обычно в конце строки */
+		write(fd1[1], &length, sizeof(int)); 
 		write(fd1[1], file_path.c_str(), length * sizeof(char)); /*сколько занимает в байтак. штук справа умножается на длину */
 
 		char symbol, *in = (char*) malloc (2 * sizeof(char)); /*маллок создает массив и задаем сколько байт в нем будет */
 		int counter = 0, size_of_in = 2;
 		std::cout << "Введите какие-то строчки. Если хотитет закончить, нажмите Ctrl+D" << std::endl;
 
+		/* тут короче динамически расширяем размер массива, путем сверки счетчика и размера массива */
 		while ((symbol = getchar()) != EOF)
 		{
 			in[counter++] = symbol;
@@ -44,17 +45,20 @@ int main()
 			}
 		}
 
-		in = (char*) realloc (in, (counter + 1) * sizeof(char)); /* риалок увеличивает либо уменьшает массив */
-		in[counter] = '\0';
+		in = (char*) realloc (in, (counter + 1) * sizeof(char)); /* с помощью реалока увеличиваем размер массива, чтобы уместить все вместе с \0 */
+		in[counter] = '\0'; /* и сделали окончание строки, потому что он сам не поймет */
 
+		/* записали в канал счетчик, содержимое массива и закрыли канал, чтобы передать в fb2 */
 		write(fd1[1], &(++counter), sizeof(int));
 		write(fd1[1], in, counter * sizeof(char));
 		close(fd1[0]);
 		close(fd1[1]);
 
+		/* ждем завершения родительского процесса */
 		int out_length, wstatus;
 		waitpid(child, &wstatus, 0);
 
+		/* проверяем успех закрытия. Если с ошибкой, то все оффаем */
 		if (wstatus)
 		{
 			close(fd2[0]);
@@ -65,13 +69,14 @@ int main()
 
 		std::cout << "Ура, ты вернулся в родительский процесс с id [" << getpid() << "]" << std::endl;
 
+		/* короче выделяем размер для массива символов out с размером тем */
 		read(fd2[0], &out_length, sizeof(int));
-		char* out = (char*) malloc (out_length); /*пон */
+		char* out = (char*) malloc (out_length);
 		read(fd2[0], out, out_length * sizeof(char));
 
 		std::ifstream fin(file_path.c_str()); /*делает поток из файла чтобы можно было считывать */
 
-		if (!fin.is_open())
+		if (!fin.is_open()) /* если файл не открывается */
 		{
 			close(fd2[0]);
 			close(fd2[1]);
@@ -82,6 +87,7 @@ int main()
 
 		std::cout << "------------------------------------------------" << std::endl << "Эти строки оканчиваются на '.' или ';' :" << std::endl;
 
+		/* читаем и выводим с файла */
 		if (fin.peek() != EOF)
 		{
 			while (!fin.eof())
@@ -94,6 +100,7 @@ int main()
 
 		std::cout << "------------------------------------------------" << std::endl << "Эти строчки не оканчиваются на '.' или ';' :" << std::endl;
 
+		/* выводим то что в out и очищаем */
 		for (int i = 0; i < out_length - 1; i++)
 		{
 			std::cout << out[i];
@@ -106,11 +113,12 @@ int main()
 
 	else
 	{
+		/*читаем с канала, сохраняем данные в переменные и массивы, с выделением дин памяти. Закрываем канал */
 		int length;
-		read(fd1[0], &length, sizeof(int)); /*из шняги считывает в переменну. длину */
+		read(fd1[0], &length, sizeof(int));
 
 		char* c_file_path = (char*) malloc (length * sizeof(char)); /* массив создали */
-		read(fd1[0], c_file_path, length * sizeof(char)); /*до этого создали стрчоку и ту считали */
+		read(fd1[0], c_file_path, length * sizeof(char)); /*до этого создали строчку и тут считали */
 
 		int counter;
 		read(fd1[0], &counter, sizeof(int));
@@ -149,6 +157,7 @@ int main()
 			}
 		}
 
+		/* чекаем что в конце строки нет начала новой строки. Если да, то делитаем */
 		if ((file_string.length()) && (file_string[file_string.length() - 1] == '\n'))
 		{
 			file_string.pop_back();
@@ -166,8 +175,8 @@ int main()
 			return 1;
 		}
 
+		/* нашли длину стринга, записали значение и содержимое в дескриптор */
 		int out_length = out_string.length() + 1;
-
 		write(fd2[1], &out_length, sizeof(int));
 		write(fd2[1], out_string.c_str(), out_length * sizeof(char));
 		close(fd2[0]);
