@@ -9,19 +9,18 @@
 #include <sys/time.h>
 
 
-void print_usage(char* cmd) {
-    printf("Usage: %s [-threads num]\n", cmd);
+void print_usage(char* cmd) { /* ф-ия для вывода потоков */
+    printf("Использование: %s [-threads num]\n", cmd);
 }
 
-bool read_matrix(float* matrix, size_t rows, size_t cols) {
+bool read_matrix(float* matrix, size_t rows, size_t cols) { /* считываем матрицу, пробегаясь по строчкам  и столбикам. Если все ок
+                                                            то тру, если нет, то вызов perror для уведомления об ошибке */
     for (size_t i = 0; i < rows; i++) {
         for (size_t j = 0; j < cols; j++) {
             if (scanf("%f", &matrix[i * cols + j]) != 1) {
-                perror("Error while reading matrix");
+                perror("Ошибка во время чтении матрицы");
                 return false;
             }
-            //scanf("%f", &matrix[i*cols + j]);
-            //printf("=== matrix[%ld] = %f\n", i*cols + j, matrix[i*cols + j]);
         }
     }
     return true;;
@@ -37,7 +36,7 @@ bool print_matrix(float* matrix, size_t rows, size_t cols) {
     return false;
 }
 
-void copy_matrix(float* from, float* to, size_t rows, size_t cols) {
+void copy_matrix(float* from, float* to, size_t rows, size_t cols) { /* выводим нашу матрицу */
     for (size_t i = 0; i < rows; i++) {
         for (size_t j = 0; j < cols; j++) {
             to[i * cols + j] = from[i * cols + j];
@@ -45,48 +44,44 @@ void copy_matrix(float* from, float* to, size_t rows, size_t cols) {
     }
 }
 
-typedef struct {
-    int thread_num;
-    int th_count;
-    int rows;
-    int cols;
-    int w_dim;
-    float** matrix1;
-    float** result1;
-    float** matrix2;
-    float** result2;
+typedef struct { /* необходимые параметры для выполнения задачи в многопоточной среде */
+    int thread_num; /* номер текущего потока выполнения */
+    int th_count; /* общее количество потоков выполнения */
+    int rows; /* количество строк в матрицах */
+    int cols; /* количество столбцов в матрицах */
+    int w_dim; /* размерность */
+    float** matrix1; /* указатель на первую матрицу */
+    float** result1; /* указатель на матрицу-результат для первой операции */
+    float** matrix2; /* указатель на вторую матрицу */
+    float** result2; /* указатель на матрицу-результат для второй операции */
 } thread_arg;
 
 void* edit_line(void* argument) {
-    thread_arg* args = (thread_arg*)argument;
+    thread_arg* args = (thread_arg*)argument; /*извлекаем значение треда_арг, номер потока и кол-во потоков*/
     const int thread_num = args->thread_num;
     const int th_count = args->th_count;
 
-    const int rows = args->rows;
+    const int rows = args->rows; /*кол-во столбцов, строк и смещение*/
     const int cols = args->cols;
     int offset = args->w_dim / 2;
 
-    float** matrix1_ptr = args->matrix1;
+    float** matrix1_ptr = args->matrix1; /*извлекаем указ-ли на матрицы и на рез-тат*/
     float** matrix2_ptr = args->matrix2;
     float** result1_ptr = args->result1;
     float** result2_ptr = args->result2;
 
-    const float* matrix1 = *matrix1_ptr;
-    const float* matrix2 = *matrix2_ptr;
+    const float* matrix1 = *matrix1_ptr; /*ук-ли на матрицы получаются из ук-телей на другие матрицы и т.д.*/
+    const float* matrix2 = *matrix2_ptr; 
     float* result1 = *result1_ptr;
     float* result2 = *result2_ptr;
+    /*короче редачим эле-ты матрицы*/
 
-    //printf("\n=== IN THREAD %d ===\n", thread_num);
-    // printf("offset = %d\n", offset);
-
-    for (int th_row = thread_num; th_row < rows; th_row += th_count) {
-        //printf("THREAD %d ROW  %d\n", thread_num, th_row);
-        for (int th_col = 0; th_col < cols; th_col++) {
-            // printf(" th_col = %d\n", th_col);
+    for (int th_row = thread_num; th_row < rows; th_row += th_count) { /*обрабатываем мат-цу*/
+        for (int th_col = 0; th_col < cols; th_col++) { /*перебираем строки матрицы с ув-ием счетчика*/
             float max = matrix1[th_row * cols + th_col];
             float min = matrix2[th_row * cols + th_col];
-            for (int i = th_row - offset; i < th_row + offset + 1; i++) {
-                for (int j = th_col - offset; j < th_col + offset + 1; j++) {
+            for (int i = th_row - offset; i < th_row + offset + 1; i++) { /*перебираем столбцы. */
+                for (int j = th_col - offset; j < th_col + offset + 1; j++) { /*ищем макс значение из мат 1 и мин из мат 2, путем перебора*/
                     float curr1, curr2;
                     if ((i < 0) || (i >= rows) || (j < 0) || (j >= cols)) {
                         curr1 = 0;
@@ -95,7 +90,6 @@ void* edit_line(void* argument) {
                         curr1 = matrix1[i * cols + j];
                         curr2 = matrix2[i * cols + j];
                     }
-                    // printf("[%d][%d] ", i, j);
                     if (curr1 > max) {
                         max = curr1;
                     }
@@ -103,37 +97,37 @@ void* edit_line(void* argument) {
                         min = curr2;
                     }
                 }
-                // printf("\n");
             }
 
-            result1[th_row * cols + th_col] = max;
-            result2[th_row * cols + th_col] = min;
+            result1[th_row * cols + th_col] = max; /*сюда макс значение*/
+            result2[th_row * cols + th_col] = min; /*сюда мин значение*/
         }
-        //printf("\n");
     }
     pthread_exit(NULL); // Заканчиваем поток
 }
 
+/*фильтруем матрицу*/
 void put_filters(float** matrix_ptr, size_t rows, size_t cols, size_t w_dim, float** res1_ptr, float** res2_ptr, int filter_cnt, int th_count) {
-    float* tmp1 = (float*)malloc(rows * cols * sizeof(float));
+    float* tmp1 = (float*)malloc(rows * cols * sizeof(float)); /*создаем массив пам-ти для первой исход матрицы*/
     if (!tmp1) {
-        perror("Error while allocating matrix\n");
+        perror("Ошибка во время распределения матрицы\n");
         exit(1);
     }
     float** matrix1_ptr = &tmp1;
+
     float* tmp2 = (float*)malloc(rows * cols * sizeof(float));
     if (!tmp2) {
-        perror("Error while allocating matrix\n");
+        perror("Ошибка во время распределения матрицы\n");
         exit(1);
     }
     float** matrix2_ptr = &tmp2;
     copy_matrix(*matrix_ptr, tmp1, rows, cols);
     copy_matrix(*matrix_ptr, tmp2, rows, cols);
 
-    pthread_t ids[th_count];
-    thread_arg args[th_count];
+    pthread_t ids[th_count]; /*сюда пар-ты для обработки мат-цы*/
+    thread_arg args[th_count]; /*сюда укат-ли на матр, пар-ты обраб-ки, номер потока*/
 
-    for (int k = 0; k < filter_cnt; k++) {
+    for (int k = 0; k < filter_cnt; k++) { /*прим-ем фильтры на матрицу. Для каждого фил-ра создаем набор пот-ов == каунтеру*/
         for (int i = 0; i < th_count; i++) {
             args[i].thread_num = i;
             args[i].th_count = th_count;
@@ -145,17 +139,18 @@ void put_filters(float** matrix_ptr, size_t rows, size_t cols, size_t w_dim, flo
             args[i].matrix2 = matrix2_ptr;
             args[i].result2 = res2_ptr;
 
-            if (pthread_create(&ids[i], NULL, edit_line, &args[i]) != 0) {
-                perror("Can't create a thread.\n");
+            if (pthread_create(&ids[i], NULL, edit_line, &args[i]) != 0) { /*не смогли соз-ть поток*/
+                perror("Не могу создать поток.\n");
             }
         }
 
-        for(int i = 0; i < th_count; i++) {
+        for(int i = 0; i < th_count; i++) { /*ждем завершения работы всех потоков*/
             if (pthread_join(ids[i], NULL) != 0) {
-                perror("Can't wait for thread\n");
+                perror("Не могу дождаться завершения потока\n");
             }
         }
 
+        /*переставляем указ-ли на массивы рез-тата и исход матрицы, если в ф-ию передано больше 1-го фильтра*/
         if (filter_cnt > 1) {
             float** swap = res1_ptr;
             res1_ptr = matrix1_ptr;
@@ -172,40 +167,41 @@ void put_filters(float** matrix_ptr, size_t rows, size_t cols, size_t w_dim, flo
 }
 
 int main(int argc, char* argv[]) {
-        printf("Enter K = ");
+        printf("Введите K = "); /*вводим значение*/
         int threads;
         scanf("%d", &threads);
 
-    if (argc == 3) {
+    if (argc == 3) { /*если 3 аргум, то значение 3го аргум испол как нов знач перемен threads*/
         threads = atoi(argv[2]);
-    } else if (argc != 1) {
+    } else if (argc != 1) { /*если др-ое знач, выз-ам ф-ию принта и оффаем раб-ту*/
         print_usage(argv[0]);
         return 0;
     }
 
     int rows;
     int cols;
-    printf("Enter matrix dimensions:\n");
+    printf("Введите размерность матрицы:\n"); /*получаем размер матрицы*/
     scanf("%d", &cols);
     scanf("%d", &rows);
     float* matrix = (float*)malloc(rows * cols * sizeof(float));
     float* res1 = (float*)malloc(rows * cols * sizeof(float));
     float* res2 = (float*)malloc(rows * cols * sizeof(float));
     if (!matrix || !res1 || !res2) {
-        perror("Error while allocating matrix\n");
+        perror("Ошибка во время распределения матрицы\n");
         return 1;
     }
-    read_matrix(matrix, rows, cols);
+    read_matrix(matrix, rows, cols); /*заполн матрицу нашими значениями*/
 
+    /*получаем раз-ть окна, кол-во примения эрозии+наращивания к матр.*/
     int w_dim;
-    printf("Enter window dimension:\n");
+    printf("Введите размерность окна:\n");
     scanf("%d", &w_dim);
     if (w_dim % 2 == 0) {
-        perror("Window dimension must be an odd number\n");
+        perror("Размер окна должен быть нечетным числом\n"); /*почему нечет? Чтобы было симметрич относит центра*/
         return 1;
     }
 
-    printf("Result \n");
+    printf("Результат \n");
     int k;
     scanf("%d", &k);
 
@@ -216,7 +212,7 @@ int main(int argc, char* argv[]) {
 
     gettimeofday(&end, NULL);
 
-    long sec = end.tv_sec - start.tv_sec;
+    long sec = end.tv_sec - start.tv_sec; /*вычисление времени размеры команды*/
     long microsec = end.tv_usec - start.tv_usec;
     if (microsec < 0) {
         --sec;
@@ -225,11 +221,11 @@ int main(int argc, char* argv[]) {
     long elapsed = sec*1000000 + microsec;
 
 
-    printf("Dilation:\n");
+    printf("Наращивание:\n");
     print_matrix(res1, rows, cols);
-    printf("Erosion:\n");
+    printf("Эрозия:\n");
     print_matrix(res2, rows, cols);
-    printf("Total time: %ld ms\n", elapsed);
+    printf("Общее время: %ld ms\n", elapsed);
 
     free(res1);
     free(res2);
