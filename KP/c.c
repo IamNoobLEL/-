@@ -6,28 +6,23 @@
 
 
 int main(int argc, char *argv[]) {
-    // argv[0] = ".\c";
-    // argv[1] = 3
-    // argv[2] = 4
-    // argv[3] = 5
     
-    // atoi: строку переводит в int
     int pac = atoi(argv[1]); 
     int pca = atoi(argv[2]); 
     int pcb = atoi(argv[3]);
     
     size_t size;
 
-    while (read(pac, &size, sizeof(size_t)) > 0) { // ждёт от программы А размер
-        char *str = (char*) malloc(size); // 
+    while (read(pac, &size, sizeof(size_t)) > 0) { /*читаем размер строки из пак и выделяем память*/
+        char *str = (char*) malloc(size);  
         if (str == NULL) {
-            printf("MALLOC from C\n");
+            printf("Выделение памяти из С\n"); 
             exit(-1);
         }
-        read(pac, str, size); // ждёт от программы А строку
-        printf("C - From a: %s\n", str);
-        write(pcb, &size, sizeof(size_t)); 
-        int ok = 1;
+        read(pac, str, size); /*читаем*/
+        printf("C - из a: %s\n", str); /*выводим строку*/
+        write(pcb, &size, sizeof(size_t)); /*записываем размер в канал связанный с B*/
+        int ok = 1; /*говорим процессу А, что он может читать след строку*/
         write(pca, &ok, sizeof(int));
         free(str);
     }
